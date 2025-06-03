@@ -29,3 +29,7 @@ source-repository head
   type:     git
   location: https://github.com/LSLeary/ord-axiomata.git
 
+source-repository this
+  type:     git
+  location: https://github.com/LSLeary/ord-axiomata.git
+  tag:      v0.1.0.0
