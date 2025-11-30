@@ -1,7 +1,7 @@
 
 -- --< Header >-- {{{
 
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, FlexibleContexts #-}
 
 
 {- |
@@ -60,6 +60,7 @@ import Data.Type.Equality ((:~:)(..))
 import Data.Type.Ord (OrderingI(..), Min, Max)
 
 -- ord-axiomata
+import Data.Type.Ord.Relations
 import Data.Type.Ord.Axiomata
 
 -- }}}
@@ -81,7 +82,7 @@ symEq
   => Sing e a -> Sing e b {- ^ -}
   -> Proof (b == a)
 symEq a b = case sub a b of
-  Refl -> Refl
+  Refl -> QED
 
 {- |
 
@@ -99,8 +100,8 @@ symNeq
   -> Proof (b /= a)
 symNeq a b = case antiSym b a of
   Refl -> case a <|=|> b of
-    LTI -> Refl
-    GTI -> Refl
+    LTI -> QED
+    GTI -> QED
 
 {- |
 
@@ -118,7 +119,7 @@ transEq
   -> Proof (a == c)
 transEq a b c = case sub a b of
   Refl -> case sub b c of
-    Refl -> Refl
+    Refl -> QED
 
 -- }}}
 
@@ -140,8 +141,8 @@ leqToGeq
   -> Proof (b >= a)
 leqToGeq a b = case antiSym b a of
   Refl -> case a <|=|> b of
-    LTI -> Refl
-    EQI -> Refl
+    LTI -> QED
+    EQI -> QED
 
 {- |
 
@@ -159,8 +160,8 @@ geqToLeq
   -> Proof (b <= a)
 geqToLeq a b = case antiSym b a of
   Refl -> case a <|=|> b of
-    EQI -> Refl
-    GTI -> Refl
+    EQI -> QED
+    GTI -> QED
 
 -- }}}
 
@@ -181,8 +182,8 @@ transLt
   => Sing o a -> Sing o b -> Sing o c {- ^ -}
   -> Proof (a < c)
 transLt a b c = case transLeq a b c of
-  Refl -> case a <|=|> c of
-    LTI -> Refl
+  QED -> case a <|=|> c of
+    LTI -> QED
     EQI -> case antiSym a b of
 
 {- |
@@ -202,8 +203,8 @@ transGt
 transGt a b c = case antiSym c b of
   Refl -> case antiSym b a of
     Refl -> case transLt c b a of
-      Refl -> case antiSym a c of
-        Refl -> Refl
+      QED -> case antiSym a c of
+        Refl -> QED
 
 {- |
 
@@ -220,10 +221,10 @@ transGeq
   => Sing o a -> Sing o b -> Sing o c {- ^ -}
   -> Proof (a >= c)
 transGeq a b c = case geqToLeq b c of
-  Refl -> case geqToLeq a b of
-    Refl -> case transLeq c b a of
-      Refl -> case leqToGeq c a of
-        Refl -> Refl
+  QED -> case geqToLeq a b of
+    QED -> case transLeq c b a of
+      QED -> case leqToGeq c a of
+        QED -> QED
 
 -- }}}
 
@@ -245,10 +246,10 @@ minDefl1
   -> Proof (Min a b <= a)
 minDefl1 a b = case a <|=|> b of
   LTI -> case refl a of
-    Refl -> Refl
-  EQI -> Refl
+    QED -> QED
+  EQI -> QED
   GTI -> case antiSym b a of
-    Refl -> Refl
+    Refl -> QED
 
 {- |
 
@@ -266,10 +267,10 @@ minDefl2
   -> Proof (Min a b <= b)
 minDefl2 a b = case a <|=|> b of
   LTI -> case refl b of
-    Refl -> Refl
-  EQI -> Refl
+    QED -> QED
+  EQI -> QED
   GTI -> case refl b of
-    Refl -> Refl
+    QED -> QED
 
 {- |
 
@@ -288,11 +289,11 @@ minMono
   -> Proof (Min a b <= Min c d)
 minMono a b c d = case c <|=|> d of
   LTI -> case minDefl1 a b of
-    Refl -> transLeq (minTO a b) a c
+    QED -> transLeq (minTO a b) a c
   EQI -> case minDefl1 a b of
-    Refl -> transLeq (minTO a b) a c
+    QED -> transLeq (minTO a b) a c
   GTI -> case minDefl2 a b of
-    Refl -> transLeq (minTO a b) b d
+    QED -> transLeq (minTO a b) b d
 
 {- |
 
@@ -333,10 +334,10 @@ maxInfl1
   => Sing o a -> Sing o b {- ^ -}
   -> Proof (a <= Max a b)
 maxInfl1 a b = case a <|=|> b of
-  LTI -> Refl
-  EQI -> Refl
+  LTI -> QED
+  EQI -> QED
   GTI -> case refl a of
-    Refl -> Refl
+    QED -> QED
 
 {- |
 
@@ -354,10 +355,10 @@ maxInfl2
   -> Proof (b <= Max a b)
 maxInfl2 a b = case a <|=|> b of
   LTI -> case refl b of
-    Refl -> Refl
-  EQI -> Refl
+    QED -> QED
+  EQI -> QED
   GTI -> case antiSym b a of
-    Refl -> Refl
+    Refl -> QED
 
 {- |
 
@@ -376,11 +377,11 @@ maxMono
   -> Proof (Max a b <= Max c d)
 maxMono a b c d = case a <|=|> b of
   LTI -> case maxInfl2 c d of
-    Refl -> transLeq b d (maxTO c d)
+    QED -> transLeq b d (maxTO c d)
   EQI -> case maxInfl2 c d of
-    Refl -> transLeq b d (maxTO c d)
+    QED -> transLeq b d (maxTO c d)
   GTI -> case maxInfl1 c d of
-    Refl -> transLeq a c (maxTO c d)
+    QED -> transLeq a c (maxTO c d)
 
 {- |
 

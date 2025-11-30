@@ -18,7 +18,8 @@ homepage:        https://github.com/LSLeary/ord-axiomata
 bug-reports:     https://github.com/LSLeary/ord-axiomata/issues
 
 library
-  exposed-modules:    Data.Type.Ord.Axiomata
+  exposed-modules:    Data.Type.Ord.Relations
+                      Data.Type.Ord.Axiomata
                       Data.Type.Ord.Lemmata
   build-depends:      base >= 4.18 && < 5
   hs-source-dirs:     src

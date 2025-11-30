@@ -1,7 +1,10 @@
 
 -- --< Header >-- {{{
 
-{-# LANGUAGE TypeFamilyDependencies, DataKinds, PatternSynonyms #-}
+{-#
+LANGUAGE
+  GADTs, TypeFamilyDependencies, DataKinds, PatternSynonyms, FlexibleContexts
+#-}
 
 
 {- |
@@ -21,11 +24,6 @@ Axiomata for easier use of "Data.Type.Ord".
 
 module Data.Type.Ord.Axiomata (
 
-  -- * Relations
-  -- $relations
-  type (<),  type (==), type (>),
-  type (<=), type (/=), type (>=),
-
   -- * Axiomata
 
   -- ** Equivalence
@@ -41,9 +39,9 @@ module Data.Type.Ord.Axiomata (
   BoundedBelow(..),
   BoundedAbove(..),
 
-  -- * Miscellaneous Type Families
+  -- * Miscellaneous Types
+  Proof(..),
   Sing,
-  Proof,
 
 ) where
 
@@ -62,44 +60,13 @@ import GHC.TypeLits
 
 -- base
 import Unsafe.Coerce (unsafeCoerce)
-import Data.Kind (Type, Constraint)
+import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(..))
-import Data.Type.Ord
-  (OrderingI(..), Compare, OrdCond, Min, Max, type (<=?), type (>=?))
+import Data.Type.Ord (OrderingI(..), Compare, Min, Max)
 import Data.Void (Void)
 
--- }}}
-
--- --< Relations >-- {{{
-
-{- $relations
-
-@'Compare' \@O@ should give rise to an equivalence relation and a total ordering on @O@.
-In particular, we can define relations:
-
-\[
-\begin{align}
-  a  <   b &\iff \mathtt{Compare} \, a \, b \sim \mathtt{LT} \\
-  a  =   b &\iff \mathtt{Compare} \, a \, b \sim \mathtt{EQ} \\
-  a  >   b &\iff \mathtt{Compare} \, a \, b \sim \mathtt{GT} \\
-  a \leq b &\iff a < b \lor a = b                            \\
-  a \neq b &\iff a < b \lor a > b                            \\
-  a \geq b &\iff a = b \lor a > b
-\end{align}
-\]
-
-These aren't consistent by construction, however—that's why we need axiomata.
-
-N.B. We use and provide fixed versions of these relations from "Data.Type.Ord" as per [#26190](https://gitlab.haskell.org/ghc/ghc/-/issues/26190).
-
--}
-
-type a <  b = Compare a b ~ LT
-type a == b = Compare a b ~ EQ
-type a >  b = Compare a b ~ GT
-type a <= b = (a <=? b)                             ~ True
-type a /= b = OrdCond (Compare a b) True False True ~ True
-type a >= b = (a >=? b)                             ~ True
+-- ord-axiomata
+import Data.Type.Ord.Relations
 
 -- }}}
 
@@ -173,19 +140,19 @@ class Equivalence e where
 
 instance Equivalence Nat where
   (=?) = defaultDecideEq
-  refl _  = Refl
+  refl _  = QED
   sub m@SNat n@SNat = case cmpNat m n of
     EQI -> Refl
 
 instance Equivalence Char where
   (=?) = defaultDecideEq
-  refl _  = Refl
+  refl _  = QED
   sub m@SChar n@SChar = case cmpChar m n of
     EQI -> Refl
 
 instance Equivalence Symbol where
   (=?) = defaultDecideEq
-  refl _  = Refl
+  refl _  = QED
   sub m@SSymbol n@SSymbol = case cmpSymbol m n of
     EQI -> Refl
 
@@ -251,11 +218,11 @@ instance TotalOrder Nat where
   transLeq l@SNat m@SNat n@SNat = case cmpNat l m of
     LTI -> case cmpNat m n of
       LTI -> case unsafeTransLt l m n of
-        Refl -> Refl
-      EQI -> Refl
+        QED -> QED
+      EQI -> QED
     EQI -> case cmpNat m n of
-      LTI -> Refl
-      EQI -> Refl
+      LTI -> QED
+      EQI -> QED
 
 instance TotalOrder Char where
   m@SChar <|=|> n@SChar = cmpChar m n
@@ -263,11 +230,11 @@ instance TotalOrder Char where
   transLeq l@SChar m@SChar n@SChar = case cmpChar l m of
     LTI -> case cmpChar m n of
       LTI -> case unsafeTransLt l m n of
-        Refl -> Refl
-      EQI -> Refl
+        QED -> QED
+      EQI -> QED
     EQI -> case cmpChar m n of
-      LTI -> Refl
-      EQI -> Refl
+      LTI -> QED
+      EQI -> QED
 
 instance TotalOrder Symbol where
   m@SSymbol <|=|> n@SSymbol = cmpSymbol m n
@@ -275,11 +242,11 @@ instance TotalOrder Symbol where
   transLeq l@SSymbol m@SSymbol n@SSymbol = case cmpSymbol l m of
     LTI -> case cmpSymbol m n of
       LTI -> case unsafeTransLt l m n of
-        Refl -> Refl
-      EQI -> Refl
+        QED -> QED
+      EQI -> QED
     EQI -> case cmpSymbol m n of
-      LTI -> Refl
-      EQI -> Refl
+      LTI -> QED
+      EQI -> QED
 
 unsafeAntiSym
   :: forall o (sing :: o -> Type) (a :: o) (b :: o)
@@ -288,9 +255,10 @@ unsafeAntiSym
 unsafeAntiSym !_ !_ = unsafeCoerce (Refl @(Compare a b))
 
 unsafeTransLt
-  :: (a < b, b < c)
+  :: forall sing a b c
+  .  (a < b, b < c)
   => sing a -> sing b -> sing c -> Proof (a < c)
-unsafeTransLt !_ !_ !_ = unsafeCoerce (Refl @LT)
+unsafeTransLt !_ !_ !_ = unsafeCoerce (QED @(a < b))
 
 -- | The minimum of two totally-ordered singletons.
 minTO :: TotalOrder o => Sing o a -> Sing o b -> Sing o (Min a b)
@@ -312,7 +280,7 @@ defaultDecideEq
   => Sing o a -> Sing o b {- ^ -}
   -> Either (a :~: b -> Void) (a :~: b)
 defaultDecideEq m n = case refl m of
-  Refl -> case m <|=|> n of
+  QED -> case m <|=|> n of
     LTI -> Left \case{}
     EQI -> Right Refl
     GTI -> Left \case{}
@@ -344,20 +312,26 @@ class TotalOrder o => BoundedBelow o where
 instance BoundedBelow Nat where
   type LowerBound Nat = 0
   lowerBound = natSing
-  least = unsafeLeast
+  least x = case lowerBound <|=|> x of
+    LTI -> QED
+    EQI -> QED
+    _   -> error "Data.Type.Ord.Axiomata.least @Nat: impossible"
 
 instance BoundedBelow Char where
   type LowerBound Char = '\NUL'
   lowerBound = charSing
-  least = unsafeLeast
+  least x = case lowerBound <|=|> x of
+    LTI -> QED
+    EQI -> QED
+    _   -> error "Data.Type.Ord.Axiomata.least @Char: impossible"
 
 instance BoundedBelow Symbol where
   type LowerBound Symbol = ""
   lowerBound = symbolSing
-  least = unsafeLeast
-
-unsafeLeast :: Sing o a -> Proof (LowerBound o <= a)
-unsafeLeast !_ = unsafeCoerce (Refl @True)
+  least x = case lowerBound <|=|> x of
+    LTI -> QED
+    EQI -> QED
+    _   -> error "Data.Type.Ord.Axiomata.least @Symbol: impossible"
 
 
 -- | 'TotalOrder's with 'UpperBound's.
@@ -382,17 +356,16 @@ class TotalOrder o => BoundedAbove o where
 
 -- }}}
 
--- --< Miscellaneous Type Families >-- {{{
+-- --< Miscellaneous Types >-- {{{
+
+-- | Proof terms.
+data Proof c = c => QED
 
 -- | A mapping from kinds to their corresponding singleton type constructors.
 type family   Sing k      = (s :: k -> Type) | s -> k
 type instance Sing Nat    = SNat
 type instance Sing Char   = SChar
 type instance Sing Symbol = SSymbol
-
--- | A mapping from equality constraints to their corresponding evidence carriers.
-type family Proof (c :: Constraint) = (r :: Type) | r -> c where
-  Proof (a ~ b) = a :~: b
 
 -- }}}
 
