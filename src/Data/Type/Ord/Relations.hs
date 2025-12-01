@@ -3,9 +3,7 @@
 
 {-#
 LANGUAGE
-  GADTs, DataKinds, ExplicitNamespaces,
-  MultiParamTypeClasses, FlexibleInstances, FlexibleContexts,
-  AllowAmbiguousTypes
+  GADTs, DataKinds, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts
 #-}
 
 {- |
@@ -44,7 +42,9 @@ module Data.Type.Ord.Relations (
   AssertEq,
 
   -- ** Precise Relations
-  type (<),  type (==), type (>),
+  type (<),
+  type (==),
+  type (>),
 
   -- * Elem
   (:<),
@@ -52,7 +52,9 @@ module Data.Type.Ord.Relations (
   which,
 
   -- ** Imprecise Relations
-  type (<=), type (/=), type (>=),
+  type (<=), ltOrEq,
+  type (/=), ltOrGt,
+  type (>=), gtOrEq,
 
 ) where
 
@@ -65,7 +67,7 @@ import GHC.TypeError (Unsatisfiable, ErrorMessage(..))
 
 -- base
 import Data.Kind (Type)
-import Data.Type.Ord (Compare)
+import Data.Type.Ord (Compare, OrdCond, type (<=?), type (>=?))
 
 -- }}}
 
@@ -95,32 +97,60 @@ type x >  y = AssertEq (Compare x y) GT (Msg x ">" y)
 type (:<) = (~:<)
 infix 4 :<
 
-which :: forall r p ps msg. (r ~ (p :< ps) msg, r) => p :<< ps
-which = which_ @_ @_ @msg
+which :: p :< ps => p :<< ps
+which = which_
 
 data (:<<) :: k -> [k] -> Type where
-  InZ ::               p :<< p:qs
+  InZ ::               p :<< p:rs
   InS :: p :<< r:ss -> p :<< q:r:ss
 infix 4 :<<
 
-class (p ~:< ps) (msg :: ErrorMessage) where
+class p ~:< ps where
   which_ :: p :<< ps
 infix 4 ~:<
 
-instance   Unsatisfiable msg  => (p ~:< '[  ]) msg where
-instance {-# OVERLAPPING  #-}    (p ~:<  p:ps) msg where
+instance {-# OVERLAPPING  #-}                          p ~:< p:ps where
   which_ = InZ
-instance {-# OVERLAPPABLE #-}
-  (ps ~ r:ss, (p ~:< ps) msg) => (p ~:<  q:ps) msg where
-  which_ = InS (which_ @_ @_ @msg)
+instance {-# OVERLAPPABLE #-} (ps ~ r:ss, p ~:< ps) => p ~:< q:ps where
+  which_ = InS which_
 
 -- }}}
 
 -- --< Imprecise Relations >-- {{{
 
-type x <= y = (Compare x y :< [LT, EQ]) (Msg x "<=" y)
-type x /= y = (Compare x y :< [LT, GT]) (Msg x "/=" y)
-type x >= y = (Compare x y :< [GT, EQ]) (Msg x ">=" y)
+type x <= y =
+  ( Compare x y :< [LT, EQ]
+  , Assert (x <=? y) (Msg x "<=" y)
+  )
+
+ltOrEq
+  :: Compare x y :< [LT, EQ]
+  => proxy1 x -> proxy2 y -> Compare x y :<< [LT, EQ]
+ltOrEq _ _ = which
+
+
+type x /=? y = OrdCond (Compare x y) True False True
+
+type x /= y =
+  ( Compare x y :< [LT, GT]
+  , Assert (x /=? y) (Msg x "/=" y)
+  )
+
+ltOrGt
+  :: Compare x y :< [LT, GT]
+  => proxy1 x -> proxy2 y -> Compare x y :<< [LT, GT]
+ltOrGt _ _ = which
+
+
+type x >= y =
+ ( Compare x y :< [GT, EQ]
+ , Assert (x >=? y) (Msg x ">=" y)
+ )
+
+gtOrEq
+  :: Compare x y :< [GT, EQ]
+  => proxy1 x -> proxy2 y -> Compare x y :<< [GT, EQ]
+gtOrEq _ _ = which
 
 -- }}}
 
