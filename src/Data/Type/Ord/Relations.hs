@@ -46,12 +46,10 @@ module Data.Type.Ord.Relations (
   -- ** Precise Relations
   type (<),  type (==), type (>),
 
-{-
   -- * Elem
   (:<),
   (:<<)(..),
   which,
--}
 
   -- ** Imprecise Relations
   type (<=), type (/=), type (>=),
@@ -66,8 +64,8 @@ module Data.Type.Ord.Relations (
 import GHC.TypeError (Unsatisfiable, ErrorMessage(..))
 
 -- base
---import Data.Kind (Type)
-import Data.Type.Ord (Compare, OrdCond, type (<=?), type (>=?))
+import Data.Kind (Type)
+import Data.Type.Ord (Compare)
 
 -- }}}
 
@@ -91,8 +89,6 @@ type x == y = AssertEq (Compare x y) EQ (Msg x "=" y)
 type x >  y = AssertEq (Compare x y) GT (Msg x ">" y)
 
 -- }}}
-
-{-
 
 -- --< Elem >-- {{{
 
@@ -128,18 +124,6 @@ type x >= y = (Compare x y :< [GT, EQ]) (Msg x ">=" y)
 
 -- }}}
 
--}
-
--- --< Imprecise Relations >-- {{{
-
-type x <= y = Assert (x <=? y) (Msg x "<=" y)
-type x /= y = Assert (x /=? y) (Msg x "/=" y)
-type x >= y = Assert (x >=? y) (Msg x ">=" y)
-
-type x /=? y = OrdCond (Compare x y) True False True
-
--- }}}
-
 -- --< Util >-- {{{
 
 type Msg x op y =
@@ -148,5 +132,4 @@ type Msg x op y =
   :<>: ShowType y
 
 -- }}}
-
 
