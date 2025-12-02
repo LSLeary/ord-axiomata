@@ -6,7 +6,6 @@ LANGUAGE
   GADTs, TypeFamilyDependencies, DataKinds, PatternSynonyms, FlexibleContexts
 #-}
 
-
 {- |
 
 Description : Axiomata for easier use of "Data.Type.Ord"

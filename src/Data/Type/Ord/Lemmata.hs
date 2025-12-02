@@ -3,7 +3,6 @@
 
 {-# LANGUAGE GADTs, FlexibleContexts #-}
 
-
 {- |
 
 Description : Lemmata for easier use of "Data.Type.Ord"

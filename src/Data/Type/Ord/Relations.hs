@@ -1,10 +1,7 @@
 
 -- --< Header >-- {{{
 
-{-#
-LANGUAGE
-  GADTs, DataKinds, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts
-#-}
+{-# LANGUAGE GADTs, DataKinds, FlexibleContexts #-}
 
 {- |
 
@@ -39,22 +36,18 @@ module Data.Type.Ord.Relations (
 
   -- * Assert
   Assert,
-  AssertEq,
 
   -- ** Precise Relations
-  type (<),
-  type (==),
-  type (>),
+  type (<), type (==), type (>),
 
-  -- * Elem
-  (:<),
-  (:<<)(..),
-  which,
+  -- * Ordering Singletons
+  SOrdering(..),
+  KnownOrdering,
+  knownOrdering,
+  compareTypes,
 
   -- ** Imprecise Relations
-  type (<=), ltOrEq,
-  type (/=), ltOrGt,
-  type (>=), gtOrEq,
+  type (<=), type (/=), type (>=),
 
 ) where
 
@@ -63,103 +56,65 @@ module Data.Type.Ord.Relations (
 -- --< Imports >-- {{{
 
 -- GHC/base
-import GHC.TypeError (Unsatisfiable, ErrorMessage(..))
+import GHC.TypeError (Assert, Unsatisfiable, ErrorMessage(..))
 
 -- base
-import Data.Kind (Type)
-import Data.Type.Ord (Compare, OrdCond, type (<=?), type (>=?))
-
--- }}}
-
--- --< Assert >-- {{{
-
-type Assert = AssertEq True
-
-type AssertEq = AssertEq_
-
-class a ~ b => AssertEq_ a b (msg :: ErrorMessage)
-
-instance {-# OVERLAPPING  #-}                      AssertEq_ a a msg
-instance {-# OVERLAPPABLE #-} Unsatisfiable msg => AssertEq_ a b msg
+import Data.Type.Ord
+  (Compare, OrdCond, type (<?), type (>?), type (<=?), type (>=?))
 
 -- }}}
 
 -- --< Precise Relations >-- {{{
 
-type x <  y = AssertEq (Compare x y) LT (Msg x "<" y)
-type x == y = AssertEq (Compare x y) EQ (Msg x "=" y)
-type x >  y = AssertEq (Compare x y) GT (Msg x ">" y)
+type x =? y = OrdCond (Compare x y) False True False
+
+type x <  y = (Compare x y ~ LT, Assert (x <? y) (Msg x "<" y))
+type x == y = (Compare x y ~ EQ, Assert (x =? y) (Msg x "=" y))
+type x >  y = (Compare x y ~ GT, Assert (x >? y) (Msg x ">" y))
 
 -- }}}
 
--- --< Elem >-- {{{
+-- --< Ordering Singletons >-- {{{
 
-type (:<) = (~:<)
-infix 4 :<
+data SOrdering (o :: Ordering) where
+  SLT :: SOrdering LT
+  SEQ :: SOrdering EQ
+  SGT :: SOrdering GT
 
-which :: p :< ps => p :<< ps
-which = which_
+type KnownOrdering = KnownOrdering_
 
-data (:<<) :: k -> [k] -> Type where
-  InZ ::               p :<< p:rs
-  InS :: p :<< r:ss -> p :<< q:r:ss
-infix 4 :<<
+knownOrdering :: KnownOrdering o => SOrdering o
+knownOrdering = knownOrdering_
 
-class p ~:< ps where
-  which_ :: p :<< ps
-infix 4 ~:<
+class    KnownOrdering_ (o :: Ordering) where knownOrdering_ :: SOrdering o
+instance KnownOrdering_  LT             where knownOrdering_ = SLT
+instance KnownOrdering_  EQ             where knownOrdering_ = SEQ
+instance KnownOrdering_  GT             where knownOrdering_ = SGT
 
-instance {-# OVERLAPPING  #-}                          p ~:< p:ps where
-  which_ = InZ
-instance {-# OVERLAPPABLE #-} (ps ~ r:ss, p ~:< ps) => p ~:< q:ps where
-  which_ = InS which_
+compareTypes
+  :: KnownOrdering (Compare x y)
+  => proxy1 x -> proxy2 y -> SOrdering (Compare x y)
+compareTypes _ _ = knownOrdering
 
 -- }}}
 
 -- --< Imprecise Relations >-- {{{
 
-type x <= y =
-  ( Compare x y :< [LT, EQ]
-  , Assert (x <=? y) (Msg x "<=" y)
-  )
-
-ltOrEq
-  :: Compare x y :< [LT, EQ]
-  => proxy1 x -> proxy2 y -> Compare x y :<< [LT, EQ]
-ltOrEq _ _ = which
-
-
 type x /=? y = OrdCond (Compare x y) True False True
 
-type x /= y =
-  ( Compare x y :< [LT, GT]
-  , Assert (x /=? y) (Msg x "/=" y)
-  )
-
-ltOrGt
-  :: Compare x y :< [LT, GT]
-  => proxy1 x -> proxy2 y -> Compare x y :<< [LT, GT]
-ltOrGt _ _ = which
-
-
-type x >= y =
- ( Compare x y :< [GT, EQ]
- , Assert (x >=? y) (Msg x ">=" y)
- )
-
-gtOrEq
-  :: Compare x y :< [GT, EQ]
-  => proxy1 x -> proxy2 y -> Compare x y :<< [GT, EQ]
-gtOrEq _ _ = which
+type x <= y = (KnownOrdering (Compare x y), Assert (x <=? y) (Msg x "<=" y))
+type x /= y = (KnownOrdering (Compare x y), Assert (x /=? y) (Msg x "/=" y))
+type x >= y = (KnownOrdering (Compare x y), Assert (x >=? y) (Msg x ">=" y))
 
 -- }}}
 
 -- --< Util >-- {{{
 
-type Msg x op y =
-  Text "Cannot satisfy: " :<>: ShowType x
-  :<>: Text " " :<>: Text op :<>: Text " "
-  :<>: ShowType y
+type Msg x op y = Unsatisfiable
+  ( Text "Cannot satisfy: " :<>: ShowType x
+    :<>: Text " " :<>: Text op :<>: Text " "
+    :<>: ShowType y
+  )
 
 -- }}}
 
